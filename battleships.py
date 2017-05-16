@@ -45,8 +45,8 @@ class Board:
         # The board attribute contains an n x n numpy array representing the game board
         # Each square of the board has a different value:
         # 0 = sea,  1 = un-hit ship section, 2 = hit ship section, 3 = previous miss
-        self.n = n
-        self.board = np.zeros((self.n, self.n), dtype=np.int)
+        self._n = n
+        self._board = np.zeros((self._n, self._n), dtype=np.int)
 
         # The ships attribute contains a list of Ship objects.
         self.ships = list()
@@ -55,57 +55,66 @@ class Board:
         # shots can target a similar area.
         # When a ship is sunk, it's coordinates are removed from the list, this is so that the AI does not continue to
         # fire near ships that are already sunk.
-        self.previous_hits = list()
+        self._previous_hits = list()
 
-    def print(self, hide_ships=False):
-        """ Prints the board.
+    def to_string(self, symbols=None):
+        """ Returns a string representation of the board.
         Args:
-            - hide_ships: If this is true, the locations of ships on the board are obscured.
-        """
-        if hide_ships:
-            symbols = {0: '~',  # Sea
-                       1: '~',  # Un-hit ship section
-                       2: 'X',  # Hit ship section
-                       3: 'O'}  # Previous miss
-        else:
+            - symbols: A dictionary mapping board square values to symbols. """
+
+        if not symbols:
             symbols = {0: '_',  # Sea
                        1: '#',  # Un-hit ship section
                        2: 'X',  # Hit ship section
                        3: 'O'}  # Previous miss
 
-        print('  ' + "_ "*self.n)
-        for row_name, row in zip(ROWS, self.board):
-            print(row_name + '|' + '|'.join([symbols[x] for x in row]) + '|')
-        print('  ' + ' '.join(COLS))
-        print('\n')
+        result = []
+        result.append('  ' + '_ '*self._n)
+        for row_name, row in zip(ROWS, self._board):
+            result.append(row_name + '|' + '|'.join([symbols[x] for x in row]) + '|')
+        result.append('  ' + ' '.join(COLS))
+        return '\n'.join(result) + '\n'
+
+    def __str__(self):
+        """ Returns a string representation of the board. """
+        return self.to_string()
+
+    def with_hidden_ships(self):
+        """ Returns a string representation of the board with the location of the ships obscured."""
+        symbols = {0: '~',  # Sea
+                   1: '~',  # Un-hit ship section
+                   2: 'X',  # Hit ship section
+                   3: 'O'}  # Previous miss
+
+        return self.to_string(symbols=symbols)
 
     def is_valid_placement(self, ship):
-        """" Checks the attributes of a Ship object to see if it can fit on the board.
+        """ Checks the attributes of a Ship object to see if it can fit on the board.
         Args:
            - ship: A Ship object.
 
         Returns:
             bool: Returns True if the Ship object can fit on the board.
         """
-        return (all(i in range(self.n) for i in ship.endpoint)  # Check to see that the ship does not end out of bounds
-                and all(self.board[point] != 1 for point in ship))  # Check for intersection with other ships
+        return (all(i in range(self._n) for i in ship.endpoint)  # Check to see that the ship does not end out of bounds
+                and all(self._board[point] != 1 for point in ship))  # Check for intersection with other ships
 
     def place_ship(self, ship):
-        """" Places a ship on the board by adding a Ship object to the Board object.
+        """ Places a ship on the board by adding a Ship object to the Board object.
         Args:
            - ship: A Ship object.
         """
         self.ships.append(ship)
 
         for point in ship:
-            self.board[point] = 1
+            self._board[point] = 1
 
     def initialise_ships_with_inputs(self, ship_lengths):
-        """" Places a player's ships on the board by using user inputs.
+        """ Places a player's ships on the board by using user inputs.
         Args:
             - ship_lengths: A list of ship lengths, representing player's allocation of ships.
         """
-        self.print()
+        print(self)
 
         for ship_length in ship_lengths:
             ship_variety = Ship(ship_length, (-1, -1), 'N').variety
@@ -123,17 +132,17 @@ class Board:
                 print('''\nInvalid placement. Ship would intersect other ships or be out of bounds; try again. \n''')
 
             self.place_ship(ship)
-            self.print()
+            print(self)
             input('{} placed, press enter to continue.\n'.format(ship_variety))
 
     def initialise_ships_randomly(self, ship_lengths):
-        """" Randomly places the ship allocation on the board.
+        """ Randomly places the ship allocation on the board.
         Args:
             - ship_lengths: A list of ship lengths, representing player's allocation of ships.
         """
         for ship_length in ship_lengths:
             while True:
-                start_coordinate = tuple(random.randint(0, self.n-1) for _ in range(2))
+                start_coordinate = tuple(random.randint(0, self._n - 1) for _ in range(2))
                 direction = random.choice(['N', 'E', 'S', 'W'])
 
                 ship = Ship(ship_length, start_coordinate, direction)
@@ -149,7 +158,7 @@ class Board:
          Returns:
             - bool: True if shot will hit
         """
-        return self.board[coordinate] == 1
+        return self._board[coordinate] == 1
 
     def vertical_neighbours(self, coordinate):
         """ Returns the directly vertical neighbours of a coordinate, if they are on the board.
@@ -159,7 +168,7 @@ class Board:
             - list: List of 2-element tuples
         """
         row, col = coordinate
-        return [(row + dy, col) for dy in [1, -1] if row + dy in range(self.n)]
+        return [(row + dy, col) for dy in [1, -1] if row + dy in range(self._n)]
 
     def horizontal_neighbours(self, coordinate):
         """ Returns the directly horizontal neighbours of a coordinate, if they are on the board.
@@ -169,7 +178,7 @@ class Board:
             - list: List of 2-element tuples
         """
         row, col = coordinate
-        return [(row, col + dx) for dx in [1, -1] if col + dx in range(self.n)]
+        return [(row, col + dx) for dx in [1, -1] if col + dx in range(self._n)]
 
     def all_neighbours(self, coordinate):
         """ Returns the direct neighbours of a coordinate, if they are on the board.
@@ -192,19 +201,19 @@ class Board:
         dx, dy = (1, 1)
         max_x_len, max_y_len = (1, 1)
 
-        while col+dx in range(self.n) and self.board[(row, col+dx)] < 3:
+        while col+dx in range(self._n) and self._board[(row, col+dx)] < 3:
             dx += 1
             max_x_len += 1
         dx = 1
-        while col-dx in range(self.n) and self.board[(row, col-dx)] < 3:
+        while col-dx in range(self._n) and self._board[(row, col-dx)] < 3:
             dx += 1
             max_x_len += 1
 
-        while row+dy in range(self.n) and self.board[(row+dy, col)] < 3:
+        while row+dy in range(self._n) and self._board[(row+dy, col)] < 3:
             dy += 1
             max_y_len += 1
         dy = 1
-        while row-dy in range(self.n) and self.board[(row-dy, col)] < 3:
+        while row-dy in range(self._n) and self._board[(row-dy, col)] < 3:
             dy += 1
             max_y_len += 1
 
@@ -213,7 +222,7 @@ class Board:
         # Find the smallest remaining ship:
         smallest_ship = min(self.ships, key=lambda s: len(s))
 
-        return (self.board[coordinate] < 2  # Check that the coordinate has not already been fired on
+        return (self._board[coordinate] < 2  # Check that the coordinate has not already been fired on
                 and len(smallest_ship) <= max_possible_len)  # Check that one of the remaining ships could fit here
 
     def apply_shot(self, coordinate):
@@ -222,10 +231,10 @@ class Board:
              - coordinate: Coordinate as a 2-element tuple
         """
         # If there is a ship at the location, mark a hit, update Ship object.
-        if self.board[coordinate] == 1:
+        if self._board[coordinate] == 1:
             print('Hit!')
-            self.board[coordinate] = 2
-            self.previous_hits.append(coordinate)
+            self._board[coordinate] = 2
+            self._previous_hits.append(coordinate)
 
             for ship in self.ships:
                 if target_coordinate in ship:
@@ -234,12 +243,12 @@ class Board:
                         print('{} sunk!'.format(ship.variety))
                         self.ships.remove(ship)
                         for point in ship:
-                            self.previous_hits.remove(point)
+                            self._previous_hits.remove(point)
 
         else:  # self.board[coordinate] != 1:
             print('Miss.')
-            if self.board[coordinate] == 0:
-                self.board[coordinate] = 3
+            if self._board[coordinate] == 0:
+                self._board[coordinate] = 3
 
     def generate_targets(self):
         """ This is the key to the AI of the computer player, the function returns a list of the coordinates on the
@@ -251,8 +260,8 @@ class Board:
 
         # Of primary interest are adjacent previous hits, normally indicating a ship.
         # Consider target coordinates that lie on the line formed by the adjacent hits.
-        if adjacent_coordinates_in(self.previous_hits):
-            for coord_pair in adjacent_coordinates_in(self.previous_hits):
+        if adjacent_coordinates_in(self._previous_hits):
+            for coord_pair in adjacent_coordinates_in(self._previous_hits):
                 coord1, coord2 = coord_pair
                 if coord1[0] - coord2[0]:  # The coordinates are vertically adjacent.
                     possible_targets += (self.vertical_neighbours(coord1) +
@@ -267,7 +276,7 @@ class Board:
             return possible_targets
 
         # If no target coordinates have been identified yet, target all neighbours of the previous hits:
-        for previous_hit in self.previous_hits:
+        for previous_hit in self._previous_hits:
             possible_targets += self.all_neighbours(previous_hit)
             # Coordinates that cannot contain ships are removed.
             possible_targets = [coord for coord in possible_targets if self.can_contain_ship(coord)]
@@ -276,7 +285,7 @@ class Board:
             return possible_targets
 
         # If there are still no identified target coordinates, return all coordinates that could contain a ship.
-        return [(row, col) for row in range(self.n) for col in range(self.n) if self.can_contain_ship((row, col))]
+        return [(row, col) for row in range(self._n) for col in range(self._n) if self.can_contain_ship((row, col))]
 
 
 def is_valid_coordinate_string(coord_string):
@@ -413,7 +422,7 @@ if __name__ == '__main__':
 
         if is_player_turn:
             input('Your turn, press enter to continue.')
-            computer_board.print(hide_ships=True)
+            print(computer_board.with_hidden_ships())
             target_coordinate = get_coordinate_input()
 
             input('Firing on {}{}! Press enter to continue.'.format(ROWS[target_coordinate[0]],
@@ -425,7 +434,7 @@ if __name__ == '__main__':
 
         else:  # It is the computer's turn
             input("Computer's turn, press enter to continue.")
-            player_board.print()
+            print(player_board)
             print('Thinking...')
 
             # Make a list of coordinates likely to contain ships.
